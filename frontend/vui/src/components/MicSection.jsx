@@ -23,7 +23,7 @@ export default function MicSection({onUserDataUpdate, onAnalysisUpdate}) {
   const responseTimeoutRef = useRef(null);
 
   // const getWsUrl = () => "ws://localhost:8000/realtime/ws/realtime";
-  const getWsUrl = () => "wss://loan-assistant-v6b5.onrender.com";
+  const getWsUrl = () => "wss://loan-assistant-v6b5.onrender.com/realtime/ws/realtime";
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
