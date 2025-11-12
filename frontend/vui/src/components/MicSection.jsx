@@ -22,7 +22,8 @@ export default function MicSection({onUserDataUpdate, onAnalysisUpdate}) {
   const isNewAssistantResponse = useRef(true);
   const responseTimeoutRef = useRef(null);
 
-  const getWsUrl = () => "ws://localhost:8000/realtime/ws/realtime";
+  // const getWsUrl = () => "ws://localhost:8000/realtime/ws/realtime";
+  const getWsUrl = () => "https://loan-assistant-v6b5.onrender.com";
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
