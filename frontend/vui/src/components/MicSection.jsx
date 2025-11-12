@@ -82,42 +82,30 @@ export default function MicSection({onUserDataUpdate, onAnalysisUpdate}) {
   };
 
   // Improved audio playback with continuous buffer
-  const playPCMAudio = async (arrayBuffer) => {
-    try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 24000
-        });
-      }
+  const playPCMAudio = useCallback(async (arrayBuffer) => {
+  if (!audioContextRef.current) {
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+  }
+  const audioContext = audioContextRef.current;
 
-      const audioContext = audioContextRef.current;
-      
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-      }
+  const length = arrayBuffer.byteLength / 2;
+  const float32Array = new Float32Array(length);
+  const view = new DataView(arrayBuffer);
 
-      // Convert PCM16 to Float32
-      const length = arrayBuffer.byteLength / 2;
-      const float32Array = new Float32Array(length);
-      const view = new DataView(arrayBuffer);
-      
-      for (let i = 0; i < length; i++) {
-        const sample = view.getInt16(i * 2, true);
-        float32Array[i] = sample / 32768.0;
-      }
+  for (let i = 0; i < length; i++) {
+    const sample = view.getInt16(i * 2, true);
+    float32Array[i] = sample / 32768.0;
+  }
 
-      // Add to buffer queue
-      audioBufferQueueRef.current.push(float32Array);
+  const audioBuffer = audioContext.createBuffer(1, float32Array.length, 24000);
+  audioBuffer.getChannelData(0).set(float32Array);
 
-      // Start playback if not already playing
-      if (!isAudioPlayingRef.current) {
-        playContinuousAudio();
-      }
-      
-    } catch (error) {
-      console.error('❌ Audio playback error:', error);
-    }
-  };
+  const source = audioContext.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(audioContext.destination);
+  source.start(0);
+}, []); // empty array: only uses stable refs
+
 
   // Continuous audio playback using a single source
   const playContinuousAudio = async () => {
