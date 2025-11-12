@@ -1,0 +1,202 @@
+
+  :root {
+    /* Dark neon theme variables */
+    --bg-1: #06070a; /* page background */
+    --bg-2: #0e1116; /* panel background */
+    --card: rgba(255,255,255,0.03);
+    --muted: rgba(255,255,255,0.6);
+    --accent: #00e6c3; /* teal/cyan neon */
+    --accent-2: #00d4ff; /* blue neon */
+    --glass: rgba(255,255,255,0.03);
+    --glow: 0 8px 30px rgba(0,230,195,0.18);
+    --radius: 14px;
+  }
+
+  /* Page */
+  body, #root {
+    background: linear-gradient(180deg, var(--bg-1) 0%, #081018 100%);
+    color: var(--muted);
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Panels */
+  .panel-left, .panel-middle, .panel-right {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius: var(--radius);
+    box-shadow: 0 6px 22px rgba(2,6,23,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+    padding: 20px;
+    margin: 8px;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+
+  /* Headings */
+  h4 { color: #e6f8f3; margin-bottom: 12px }
+
+  /* Subtle cards */
+  .card-muted {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 12px;
+    color: var(--muted);
+  }
+
+  /* Mic pulse + neon glow */
+  @keyframes neonPulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,230,195,0.22); }
+    50% { transform: scale(1.05); box-shadow: 0 0 40px 12px rgba(0,230,195,0.06); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,230,195,0.0); }
+  }
+
+  @keyframes outerRing {
+    0% { transform: scale(0.9); opacity: 0.8 }
+    100% { transform: scale(1.7); opacity: 0 }
+  }
+
+  /* Mic button */
+  .mic-button {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin: 20px auto;
+    position: relative;
+    background: radial-gradient(circle at 35% 25%, rgba(255,255,255,0.06), rgba(0,0,0,0.25)), linear-gradient(180deg, #062022 0%, #041018 100%);
+    border: 2px solid rgba(0,212,255,0.08);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6), 0 0 18px rgba(0,212,255,0.03);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .mic-button:hover { transform: translateY(-4px) scale(1.03); }
+
+  /* inner neon circle */
+  .mic-button::before{
+    content: "";
+    position: absolute;
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, var(--accent), var(--accent-2));
+    box-shadow: 0 6px 30px rgba(0,230,195,0.22), 0 0 40px rgba(0,212,255,0.08);
+    z-index: 1;
+  }
+
+  .mic-button span { position: relative; z-index: 2; font-size: 2.4rem; color: #021417 }
+
+  /* outer pulsating ring for recording state */
+  .mic-button::after{
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%; transform: translate(-50%,-50%);
+    width: 120px; height: 120px; border-radius: 50%;
+    z-index: 0; pointer-events: none;
+  }
+
+  .mic-recording::after{
+    background: radial-gradient(circle, rgba(0,230,195,0.06), rgba(0,212,255,0.0));
+    animation: outerRing 1.6s ease-out infinite;
+  }
+
+  /* subtle inner recording animation */
+  .mic-recording::before{ animation: neonPulse 1.2s infinite; }
+
+  /* Waveform bars inside mic button */
+  .waveform{
+    position: absolute;
+    display: flex;
+    gap: 6px;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    align-items: end;
+  }
+  .waveform .bar{
+    width: 6px;
+    height: 8px;
+    background: linear-gradient(180deg,var(--accent-2),var(--accent));
+    border-radius: 3px;
+    opacity: 0.95;
+    transform-origin: bottom center;
+  }
+
+  /* individual animations */
+  .waveform .b1{ animation: wave1 900ms infinite ease-in-out; }
+  .waveform .b2{ animation: wave2 850ms infinite ease-in-out; }
+  .waveform .b3{ animation: wave3 800ms infinite ease-in-out; }
+  .waveform .b4{ animation: wave2 950ms infinite ease-in-out; }
+  .waveform .b5{ animation: wave1 1000ms infinite ease-in-out; }
+
+  @keyframes wave1{ 0%{ transform: scaleY(0.3) } 50%{ transform: scaleY(1.0) } 100%{ transform: scaleY(0.3) } }
+  @keyframes wave2{ 0%{ transform: scaleY(0.4) } 50%{ transform: scaleY(1.2) } 100%{ transform: scaleY(0.4) } }
+  @keyframes wave3{ 0%{ transform: scaleY(0.2) } 50%{ transform: scaleY(1.4) } 100%{ transform: scaleY(0.2) } }
+
+  /* hide waveform when not recording (keeps markup visible for a11y) */
+  .mic-button .waveform{ opacity: 0; transform: translateX(-50%) scaleY(0.9); transition: opacity 160ms ease, transform 160ms ease }
+  .mic-button.mic-recording .waveform{ opacity: 1; transform: translateX(-50%) scaleY(1) }
+
+  /* mic image overlay */
+  .mic-image{
+    position: relative;
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    filter: drop-shadow(0 6px 18px rgba(0,230,195,0.12));
+  }
+  .mic-button.mic-recording .mic-image{
+    filter: drop-shadow(0 10px 30px rgba(0,230,195,0.22)) hue-rotate(0deg) saturate(120%);
+    transform: translateY(-2px);
+  }
+
+  /* Chat messages */
+  .chat-container {
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 18px;
+    padding-right: 6px;
+  }
+
+  .chat-message {
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border-radius: 16px;
+    max-width: 84%;
+    word-break: break-word;
+  }
+
+  .chat-user {
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    color: #cfeee7;
+    align-self: flex-end;
+    border: 1px solid rgba(255,255,255,0.02);
+  }
+
+  .chat-bot {
+    background: linear-gradient(180deg, rgba(0,230,195,0.12), rgba(0,212,255,0.06));
+    color: #001a15;
+    align-self: flex-start;
+    border-left: 4px solid var(--accent);
+    box-shadow: 0 6px 20px rgba(0,230,195,0.04);
+  }
+
+  /* Analysis list styling */
+  .list-group-item { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.03); border-radius: 8px; margin-bottom: 8px }
+
+  /* small helpers */
+  .btn-accent { background: linear-gradient(90deg,var(--accent),var(--accent-2)); color: #021417; border: none; box-shadow: var(--glow); }
+
+  .muted-text { color: rgba(255,255,255,0.5) }
+
+  /* responsive tweaks */
+  @media (max-width: 768px) {
+    .mic-button { width: 96px; height: 96px }
+    .mic-button::before{ width: 56px; height: 56px }
+  }
+
+
