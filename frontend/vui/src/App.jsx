@@ -6,7 +6,8 @@ import AnalysisPanel from "./components/AnalysisPanel";
 function App() {
   const [userData, setUserData] = useState({});
   const [analysis, setAnalysis] = useState({});
-  const [conversation, setConversation] = useState([]);
+  // const [conversation, setConversation] = useState([]);
+  const [, setConversation] = useState([]);
 
   // Function to update user data dynamically
   const handleUserDataUpdate = (newData) => {
