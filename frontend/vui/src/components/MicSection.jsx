@@ -83,7 +83,8 @@ export default function MicSection({onUserDataUpdate, onAnalysisUpdate}) {
 
   // Improved audio playback with continuous buffer
   // Improved audio playback with continuous buffer
-const playPCMAudio = async (arrayBuffer) => {
+// Wrap playPCMAudio in useCallback so it’s stable across renders
+const playPCMAudio = useCallback(async (arrayBuffer) => {
   try {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
@@ -118,7 +119,8 @@ const playPCMAudio = async (arrayBuffer) => {
   } catch (error) {
     console.error('❌ Audio playback error:', error);
   }
-};
+}, []); // 
+
 
 // Continuous audio playback using a single source
 async function playContinuousAudio() {
