@@ -528,7 +528,7 @@ export default function MicSection({onUserDataUpdate, onAnalysisUpdate}) {
         }
       }, 5000);
     });
-  }, [startAudioCapture, stopRealtimeStreaming]);
+  }, [startAudioCapture, stopRealtimeStreaming, playPCMAudio, onAnalysisUpdate, onUserDataUpdate]);
 
   const handleMicClick = async () => {
     if (isTTSAudioPlaying.current) {
