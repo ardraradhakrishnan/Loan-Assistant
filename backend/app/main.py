@@ -37,6 +37,11 @@ conversation_log = []
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD") 
 
+
+@app.get("/")
+async def root():
+    return {"message": "Backend running successfully on Render"}
+
 def send_email_report(to_email: str, subject: str, body: str):
     """Send an email with EMI analysis to the user."""
     msg = MIMEText(body, "plain")
