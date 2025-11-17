@@ -22,7 +22,6 @@ export default function MicSection({onUserDataUpdate, onAnalysisUpdate}) {
   const isNewAssistantResponse = useRef(true);
   const responseTimeoutRef = useRef(null);
 
-  // const getWsUrl = () => "ws://localhost:8000/realtime/ws/realtime";
   const getWsUrl = () => "wss://loan-assistant-v6b5.onrender.com/realtime/ws/realtime";
 
   // Auto-scroll to bottom when new messages arrive
@@ -81,9 +80,52 @@ export default function MicSection({onUserDataUpdate, onAnalysisUpdate}) {
     return { level, hasSpeech };
   };
 
+
+
+  
+  // Continuous audio playback using a single source
+  const playContinuousAudio = async () => {
+    if (isAudioPlayingRef.current || audioBufferQueueRef.current.length === 0) {
+      return;
+    }
+
+    isAudioPlayingRef.current = true;
+
+    try {
+      while (audioBufferQueueRef.current.length > 0) {
+        const float32Array = audioBufferQueueRef.current.shift();
+        
+        // Create audio buffer
+        const audioBuffer = audioContextRef.current.createBuffer(1, float32Array.length, 24000);
+        audioBuffer.getChannelData(0).set(float32Array);
+        
+        // Create and play source
+        const source = audioContextRef.current.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContextRef.current.destination);
+        currentAudioSourceRef.current = source;
+        
+        // Play and wait for completion
+        await new Promise((resolve) => {
+          source.start();
+          source.onended = () => {
+            resolve();
+          };
+          
+          // Fallback timeout in case onended doesn't fire
+          setTimeout(resolve, (float32Array.length / 24000) * 1000 + 50);
+        });
+        
+        currentAudioSourceRef.current = null;
+      }
+    } catch (error) {
+      console.error('❌ Continuous audio playback error:', error);
+    }
+
+    isAudioPlayingRef.current = false;
+  };
   // Improved audio playback with continuous buffer
-  // Improved audio playback with continuous buffer
-// Wrap playPCMAudio in useCallback so it’s stable across renders
+  // Improved audio playback with continuous buffer (memoized)
 const playPCMAudio = useCallback(async (arrayBuffer) => {
   try {
     if (!audioContextRef.current) {
@@ -93,7 +135,7 @@ const playPCMAudio = useCallback(async (arrayBuffer) => {
     }
 
     const audioContext = audioContextRef.current;
-    
+
     if (audioContext.state === 'suspended') {
       await audioContext.resume();
     }
@@ -102,7 +144,7 @@ const playPCMAudio = useCallback(async (arrayBuffer) => {
     const length = arrayBuffer.byteLength / 2;
     const float32Array = new Float32Array(length);
     const view = new DataView(arrayBuffer);
-    
+
     for (let i = 0; i < length; i++) {
       const sample = view.getInt16(i * 2, true);
       float32Array[i] = sample / 32768.0;
@@ -115,54 +157,13 @@ const playPCMAudio = useCallback(async (arrayBuffer) => {
     if (!isAudioPlayingRef.current) {
       playContinuousAudio();
     }
-    
+
   } catch (error) {
-    console.error('❌ Audio playback error:', error);
+    console.error("❌ Audio playback error:", error);
   }
-}, []); // 
+}, [playContinuousAudio]);
 
 
-// Continuous audio playback using a single source
-async function playContinuousAudio() {
-  if (isAudioPlayingRef.current || audioBufferQueueRef.current.length === 0) {
-    return;
-  }
-
-  isAudioPlayingRef.current = true;
-
-  try {
-    while (audioBufferQueueRef.current.length > 0) {
-      const float32Array = audioBufferQueueRef.current.shift();
-      
-      // Create audio buffer
-      const audioBuffer = audioContextRef.current.createBuffer(1, float32Array.length, 24000);
-      audioBuffer.getChannelData(0).set(float32Array);
-      
-      // Create and play source
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContextRef.current.destination);
-      currentAudioSourceRef.current = source;
-      
-      // Play and wait for completion
-      await new Promise((resolve) => {
-        source.start();
-        source.onended = () => {
-          resolve();
-        };
-        
-        // Fallback timeout in case onended doesn't fire
-        setTimeout(resolve, (float32Array.length / 24000) * 1000 + 50);
-      });
-      
-      currentAudioSourceRef.current = null;
-    }
-  } catch (error) {
-    console.error('❌ Continuous audio playback error:', error);
-  }
-
-  isAudioPlayingRef.current = false;
-}
 
   const cleanupAudio = useCallback(() => {
       try {
@@ -230,6 +231,7 @@ async function playContinuousAudio() {
     cleanupAudio();
     console.log("✅ Streaming stopped");
   }, [cleanupAudio]);
+
 
   const startAudioCapture = useCallback(async () => {
     try {
@@ -326,22 +328,72 @@ async function playContinuousAudio() {
     }
   }, []);
 
+  // ---- UPDATED startRealtimeStreaming with retry logic ----
   const startRealtimeStreaming = useCallback(async () => {
+    // If already connected and open, skip
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       console.log("✅ WebSocket already connected");
       return true;
     }
 
-    return new Promise((resolve, reject) => {
-      console.log("🔗 Connecting to WebSocket...");
-      setConnectionStatus("connecting");
+    setConnectionStatus("connecting");
+    const wsUrl = getWsUrl();
+    const maxRetries = 6;
+    const retryDelayMs = 5000;
 
-      const ws = new WebSocket(getWsUrl());
-      wsRef.current = ws;
+    let lastError = null;
 
-      ws.onopen = () => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔗 Attempt ${attempt} connecting to WebSocket...`);
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        // Wait for open or timeout/error
+        await new Promise((resolve, reject) => {
+          let settled = false;
+          const openHandler = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+          };
+          const errorHandler = (err) => {
+            if (settled) return;
+            settled = true;
+            reject(new Error("WebSocket connection failed"));
+          };
+          const closeHandler = (ev) => {
+            if (settled) return;
+            settled = true;
+            reject(new Error(`WebSocket closed before open: ${ev.code}`));
+          };
+          // connection timeout
+          const to = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            try { ws.close(); } catch (e) {}
+            reject(new Error("WebSocket connection timeout"));
+          }, 5000);
+
+          ws.onopen = () => {
+            clearTimeout(to);
+            openHandler();
+          };
+          ws.onerror = (e) => {
+            clearTimeout(to);
+            errorHandler(e);
+          };
+          ws.onclose = (ev) => {
+            clearTimeout(to);
+            closeHandler(ev);
+          };
+        });
+
+        // If we get here, ws is open
         console.info("✅ WebSocket connected");
         setConnectionStatus("connected");
+
+        // Send config immediately
         ws.send(
           JSON.stringify({
             type: "config",
@@ -350,10 +402,9 @@ async function playContinuousAudio() {
             encoding: "linear16",
           })
         );
-        resolve(true);
-      };
 
-      ws.onmessage = async (evt) => {
+        // Attach message handler (kept identical to your original)
+        ws.onmessage = async (evt) => {
           // Handle binary audio data (Blob)
           if (evt.data instanceof Blob) {
             console.log("🔊 Received audio blob:", evt.data.size, "bytes");
@@ -508,30 +559,57 @@ async function playContinuousAudio() {
           }
         };
 
-      ws.onclose = (event) => {
-        console.log("🔴 WebSocket closed:", event.code, event.reason);
-        setConnectionStatus("disconnected");
-        
-        if (event.code !== 1000) {
-          reject(new Error(`WebSocket closed: ${event.code} ${event.reason}`));
-        }
-      };
+        // onclose: try to reconnect after a short delay (no immediate reject)
+        ws.onclose = (event) => {
+          console.log("🔴 WebSocket closed:", event.code, event.reason);
+          setConnectionStatus("disconnected");
 
-      ws.onerror = (e) => {
-        console.error("🔴 WebSocket error:", e);
-        setConnectionStatus("error");
-        reject(new Error("WebSocket connection failed"));
-      };
+          // If it was an abnormal close, attempt reconnect after a delay
+          if (event.code !== 1000) {
+            console.log("⏳ Abnormal close - retrying in 5 seconds...");
+            setTimeout(() => {
+              // Only try to reconnect if user still expects recording
+              if (isRecording) {
+                startRealtimeStreaming().catch((err) => {
+                  console.warn("Retry failed:", err);
+                });
+              }
+            }, retryDelayMs);
+          }
+        };
 
-      // Set timeout for connection
-      setTimeout(() => {
-        if (ws.readyState !== WebSocket.OPEN) {
-          reject(new Error("WebSocket connection timeout"));
-          ws.close();
+        // onerror: attempt reconnect after a delay
+        ws.onerror = (e) => {
+          console.error("🔴 WebSocket error:", e);
+          setConnectionStatus("error");
+
+          console.log("⏳ WebSocket error - retrying in 5 seconds...");
+          setTimeout(() => {
+            if (isRecording) {
+              startRealtimeStreaming().catch((err) => {
+                console.warn("Retry failed:", err);
+              });
+            }
+          }, retryDelayMs);
+        };
+
+        // Connected and handlers attached — success
+        return true;
+      } catch (err) {
+        lastError = err;
+        console.warn(`Connection attempt ${attempt} failed:`, err);
+        // wait before next attempt
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, retryDelayMs));
+          continue;
+        } else {
+          // exhausted attempts
+          console.error("❌ All connection attempts failed.");
+          throw lastError;
         }
-      }, 5000);
-    });
-  }, [startAudioCapture, stopRealtimeStreaming, playPCMAudio, onAnalysisUpdate, onUserDataUpdate]);
+      }
+    } // end for
+  }, [startAudioCapture, stopRealtimeStreaming, isRecording, onAnalysisUpdate, onUserDataUpdate, playPCMAudio]);
 
   const handleMicClick = async () => {
     if (isTTSAudioPlaying.current) {
@@ -661,5 +739,5 @@ async function playContinuousAudio() {
         )}
       </div> */}
     </div>
-  );
+  )
 }
