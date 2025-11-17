@@ -84,85 +84,69 @@ export default function MicSection({onUserDataUpdate, onAnalysisUpdate}) {
 
   
   // Continuous audio playback using a single source
-  const playContinuousAudio = async () => {
-    if (isAudioPlayingRef.current || audioBufferQueueRef.current.length === 0) {
+  const playContinuousAudio = useCallback(() => {
+  if (isAudioPlayingRef.current) return;
+
+  isAudioPlayingRef.current = true;
+
+  const processQueue = () => {
+    if (audioBufferQueueRef.current.length === 0) {
+      isAudioPlayingRef.current = false;
       return;
     }
 
-    isAudioPlayingRef.current = true;
+    const audioContext = audioContextRef.current;
+    const audioData = audioBufferQueueRef.current.shift();
 
-    try {
-      while (audioBufferQueueRef.current.length > 0) {
-        const float32Array = audioBufferQueueRef.current.shift();
-        
-        // Create audio buffer
-        const audioBuffer = audioContextRef.current.createBuffer(1, float32Array.length, 24000);
-        audioBuffer.getChannelData(0).set(float32Array);
-        
-        // Create and play source
-        const source = audioContextRef.current.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContextRef.current.destination);
-        currentAudioSourceRef.current = source;
-        
-        // Play and wait for completion
-        await new Promise((resolve) => {
-          source.start();
-          source.onended = () => {
-            resolve();
-          };
-          
-          // Fallback timeout in case onended doesn't fire
-          setTimeout(resolve, (float32Array.length / 24000) * 1000 + 50);
-        });
-        
-        currentAudioSourceRef.current = null;
-      }
-    } catch (error) {
-      console.error('❌ Continuous audio playback error:', error);
-    }
+    // Create audio buffer
+    const buffer = audioContext.createBuffer(1, audioData.length, 24000);
+    buffer.copyToChannel(audioData, 0);
 
-    isAudioPlayingRef.current = false;
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+
+    source.connect(audioContext.destination);
+    source.start();
+
+    source.onended = processQueue;
   };
-  // Improved audio playback with continuous buffer
-  // Improved audio playback with continuous buffer (memoized)
-const playPCMAudio = useCallback(async (arrayBuffer) => {
+
+  processQueue();
+}, []);
+
+  const playPCMAudio = useCallback(async (arrayBuffer) => {
   try {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: 24000
+        sampleRate: 24000,
       });
     }
 
     const audioContext = audioContextRef.current;
 
-    if (audioContext.state === 'suspended') {
+    if (audioContext.state === "suspended") {
       await audioContext.resume();
     }
 
-    // Convert PCM16 to Float32
+    // PCM16 → Float32 conversion
     const length = arrayBuffer.byteLength / 2;
     const float32Array = new Float32Array(length);
     const view = new DataView(arrayBuffer);
 
     for (let i = 0; i < length; i++) {
       const sample = view.getInt16(i * 2, true);
-      float32Array[i] = sample / 32768.0;
+      float32Array[i] = sample / 32768;
     }
 
-    // Add to buffer queue
     audioBufferQueueRef.current.push(float32Array);
 
-    // Start playback if not already playing
     if (!isAudioPlayingRef.current) {
       playContinuousAudio();
     }
-
-  } catch (error) {
-    console.error("❌ Audio playback error:", error);
+  } catch (err) {
+    console.error("❌ Audio playback error:", err);
   }
 }, [playContinuousAudio]);
-
 
 
   const cleanupAudio = useCallback(() => {
